@@ -15,7 +15,6 @@ from datasets import load_dataset
 import evaluate
 from huggingface_hub import login
 
-import label_subsets
 import footprint
 
 def hprint(text):
