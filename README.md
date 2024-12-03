@@ -8,3 +8,6 @@ This is a final project for MIT 6.5940, taken Fall 2024.
 # Usage
 ## Pruning a model
 ## Evaluating our pruned models
+
+# Acknowledgements
+Our codebase was developed based on the following repos:
