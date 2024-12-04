@@ -15,27 +15,22 @@ from datasets import load_dataset
 import evaluate
 from huggingface_hub import login
 
-import footprint
+import torch_pruning as tp
+from footprint import evaluate_footprint
 
-def hprint(text):
-	print('-'*50)
+def hprint(text, symb="#"):
+	print(symb*50)
 	print(text)
-	print('-'*50)
+	print(symb*50)
 
 def process_batch(batch):
-	if "labels" in batch.keys():
-		label_key = "labels"
-	else:
-		label_key = "label"
+	label_key = "labels" if "labels" in batch.keys() else "label"
 	inputs = processor([x for x in batch["image"]], return_tensors="pt")
 	inputs["label"] = batch[label_key]
 	return inputs
 
 def collate_fn(batch):
-	if "labels" in batch[0].keys():
-		label_key = "labels"
-	else:
-		label_key = "label"
+	label_key = "labels" if "labels" in batch[0].keys() else "label"
 	return {
 		"pixel_values": torch.stack([x["pixel_values"] for x in batch]),
 		"labels": torch.tensor([x[label_key] for x in batch])
@@ -69,21 +64,19 @@ if __name__=="__main__":
 	# setup environment
 	os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 	os.environ['HF_HOME'] = args.cache
-	device = "cuda"
-	if args.use_cpu:
-		device = "cpu"
+	device = "cpu" if args.use_cpu else "cuda"
 	login("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")
 	timestamp = int(datetime.datetime.now().timestamp())
+	run_path = f"{args.output}/{args.dataset}/{timestamp}"
+	os.makedirs(run_path)
 	
 	# setup dataset
 	ds = load_dataset(args.dataset, cache_dir=args.cache)
 	prepared_ds = ds.with_transform(process_batch)
-	if args.dataset == "beans":
-		label_key = "labels"
-	else:
-		label_key = "label"
+	label_key = "labels" if args.dataset == "beans" else "label"
 	labels = ds["train"].features[label_key].names
-	
+	dummy_input = torch.randn(1, 3, 224, 224).to(device)
+
 	# load model
 	processor = AutoImageProcessor.from_pretrained(args.model, use_fast=True)
 	model = ViTForImageClassification.from_pretrained(
@@ -92,11 +85,34 @@ if __name__=="__main__":
 		id2label={str(i): c for i, c in enumerate(labels)},
 		label2id={c: str(i) for i, c in enumerate(labels)},
 		ignore_mismatched_sizes=True
+	).to(device)
+	hprint(model, symb="-")
+
+	# prune model
+	hprint("PRUNING MODEL")
+	imp = tp.importance.RandomImportance()
+	ignored_layers = [] # ignore final classification layer
+	for m in model.modules():
+		if isinstance(m, torch.nn.Linear) and m.out_features == len(labels):
+			ignored_layers.append(m)
+	pruner = tp.pruner.MetaPruner(
+		model,
+		dummy_input,
+		importance=imp,
+		pruning_ratio=0.5,
+		ignored_layers=ignored_layers,
+		global_pruning=True,
+		isomorphic=True,
 	)
-	
+	hprint("Footprint before pruning", symb="-")
+	evaluate_footprint(model, dummy_input, display=True, save_path=f"{run_path}/preprune_footprint.json")
+	pruner.step()
+	hprint("Footprint after pruning", symb="-")
+	evaluate_footprint(model, dummy_input, display=True, save_path=f"{run_path}/postprune_footprint.json")
+
 	# setup training harness
 	training_args = TrainingArguments(
-		output_dir=f"{args.output}/{args.dataset}/{timestamp}",
+		output_dir=run_path,
 		optim=args.optimizer,
 		use_cpu=args.use_cpu,
 		lr_scheduler_type=args.scheduler,
@@ -138,24 +154,14 @@ if __name__=="__main__":
 	eval_results = trainer.evaluate(prepared_ds["validation"])
 	trainer.log_metrics("eval", eval_results)
 	trainer.save_metrics("eval", eval_results)
-	footprint_eval = dict()
-	footprint_eval["model_size"] = footprint.get_model_size(model)
-	footprint_eval["model_sparsity"] = footprint.get_model_sparsity(model)
-	footprint_eval["model_macs"]= footprint.get_model_macs(model, torch.randn(1, 3, 224, 224).to(device))
-	footprint_eval["model_num_parameters"] = footprint.get_num_parameters(model)
-	print("MODEL SIZE (Mb): ", footprint_eval["model_size"]/(8*1000*1000))
-	print("SPARSITY: ", footprint_eval["model_sparsity"])
-	print("MACS: ", footprint_eval["model_macs"])
-	print("NUM PARAMS: ", footprint_eval["model_num_parameters"])
-	with open(f"{args.output}/{args.dataset}/{timestamp}/footprint_eval.json", "w") as f:
-		json.dump(footprint_eval, f)
+	evaluate_footprint(model, dummy_input, display=True, save_path=f"{run_path}/postfinetune_footprint.json")
 
 	# save results
 	trainer.save_model()
 	trainer.save_state()
 	
 	# save command
-	with open(f"{args.output}/{args.dataset}/{timestamp}/command.txt", "x") as f:
+	with open(f"{run_path}/command.txt", "x") as f:
 		f.write(" ".join(sys.argv))
 
 
