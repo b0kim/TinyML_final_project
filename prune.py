@@ -13,14 +13,15 @@ from transformers.models.vit.modeling_vit import ViTSelfAttention, ViTSelfOutput
 
 import torch_pruning as tp
 from dataset import *
-from evaluate import *
+from evaluation import *
 from utils import *
 
 if __name__=="__main__":
 	parser = argparse.ArgumentParser()
 	# general arguments
-	parser.add_argument("-m", "--model", default="bryanzhou008/vit-base-patch16-224-in21k-finetuned-inaturalist", help="Which model tag to load, or a path to a local .pt file")
-	parser.add_argument("-d", "--dataset-root", required=True, help="Directory where dataset images are stored")
+	parser.add_argument("-m", "--model", default="google/vit-base-patch16-224", help="Which model tag to load, or a path to a local .pt file")
+	parser.add_argument("-d", "--dataset", required=True, choices=["imagenet-1k", "beans", "coralnet"], help="Dataset choice")
+	parser.add_argument("-c", "--cache", default="~/.cache/huggingface", help="Huggingface cache directory")
 	parser.add_argument("-o", "--output-root", default="./results", help="Root experiment directory")
 	parser.add_argument("-en", "--experiment-name", required=True, help="What to name this experiment")
 	parser.add_argument("-ev", "--no-evaluation", action="store_true", help="Whether or not to run evaluations")
@@ -41,25 +42,33 @@ if __name__=="__main__":
 	experiment_path = create_experiment_dir(args.output_root, args.experiment_name)
 	write_file(" ".join(sys.argv), experiment_path, "prune_command", "txt") # save command for reference
 	
-	# setup dataset
-	hprint("GETTING DATALOADERS")
-	if "inaturalist" in args.dataset_root:
-		train_loader, val_loader, num_classes = get_inaturalist(args.dataset_root, args.train_batch_size, args.val_batch_size, 4, "phylum")
-	elif "imagenet" in args.dataset_root:
-		train_loader, val_loader, num_classes = get_imagenet(args.dataset_root, args.train_batch_size, args.val_batch_size, 4)
-	dummy_input = torch.randn(1, 3, 224, 224).to(device)
-
 	# load model
 	hprint("LOADING MODEL")
-	# TODO: load local model, and import its model_name
-	model_name = args.model.replace("/", "-")
-	model = ViTForImageClassification.from_pretrained(args.model, ignore_mismatched_sizes=True, num_labels=num_classes).to(device)
-	new_model_name = f"{args.pruning_type}_{args.pruning_ratio}_{model_name}"
+	if os.path.isfile(args.model): # load from local file
+		model_name = args.model.split("/")[-1]
+		hf_model_name = args.model.split("/")[-1][:-3].split("_")[-1].replace("-", "/", 1)
+		model = torch.load(args.model).to(device)
+	else: # load from huggingface hub
+		model_name = args.model.replace("/", "-")
+		hf_model_name = args.model
+		model = ViTForImageClassification.from_pretrained(hf_model_name, ignore_mismatched_sizes=True, num_labels=get_num_classes(args.dataset)).to(device)
+	new_model_name = f"{args.pruning_type}_{args.pruning_ratio}_{model_name.replace('.pt', '')}"
 	print(model)
+
+	# load dataset
+	hprint("LOADING DATASETS")
+	if args.dataset == "imagenet-1k":
+		prepared_ds, processor, collate_fn = get_imagenet(args.cache, hf_model_name)
+	elif args.dataset == "beans":
+		prepared_ds, processor, collate_fn = get_beans(args.cache, hf_model_name)
+	elif args.dataset == "coralnet":
+		raise NotImplementedError
+	dummy_input = torch.randn(1, 3, 224, 224).to(device)
 
 	# evaluate model
 	if not args.no_evaluation:
 		hprint("EVALUATING MODEL PRE-PRUNING")
+		val_loader = DataLoader(prepared_ds["validation"])
 		footprint_metrics_preprune = evaluate_footprint(model, dummy_input, display=True)
 		performance_metrics_preprune = evaluate_performance(model, val_loader, device, display=True)
 		metrics_preprune = footprint_metrics_preprune | performance_metrics_preprune
@@ -99,8 +108,12 @@ if __name__=="__main__":
 	)
 	if isinstance(imp, tp.importance.TaylorImportance):
 		model.zero_grad()
-		for k, (imgs, lbls) in enumerate(train_loader):
+		train_loader = DataLoader(prepared_ds["train"])
+		for k, batch in enumerate(train_loader):
 			if k>=args.taylor_batches: break
+			label_key = "labels" if "labels" in batch else "label"
+			imgs = batch["pixel_values"]
+			lbls = batch[label_key]
 			imgs = imgs.to(device)
 			lbls = lbls.to(device)
 			output = model(imgs).logits
