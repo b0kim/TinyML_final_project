@@ -1,30 +1,42 @@
-import json
+import os, sys
+from tqdm import tqdm
+
 import torch
+import torch.nn.functional as F
 from torch import nn
-from torchprofile import profile_macs
 
-Byte = 8
-KiB = 1024 * Byte
-MiB = 1024 * KiB
-GiB = 1024 * MiB
+import torch_pruning as tp
 
-def evaluate_footprint(model, inputs, display=True, save_path=None):
+def evaluate_performance(model, val_loader, device, display=True):
 	metrics = dict()
-	metrics["macs"] = get_model_macs(model, inputs)
+	model.eval()
+	correct = 0
+	loss = 0
+	with torch.no_grad():
+		for images, labels in tqdm(val_loader):
+			images, labels = images.to(device), labels.to(device)
+			outputs = model(images).logits
+			loss += F.cross_entropy(outputs, labels, reduction='sum').item()
+			_, predicted = torch.max(outputs, 1)
+			correct += (predicted == labels).sum().item()
+	metrics["mean_accuracy"] = correct / len(val_loader.dataset)
+	metrics["mean_loss"] = loss / len(val_loader.dataset)
+	if display:
+		print(f"Average accuracy: {metrics['mean_accuracy']}")
+		print(f"Average loss: {metrics['mean_loss']}")
+	return metrics
+
+def evaluate_footprint(model, inputs, display=True):
+	metrics = dict()
+	metrics["macs"], metrics["n_params"] = tp.utils.count_ops_and_params(model, inputs)
 	metrics["sparsity"] = get_model_sparsity(model)
-	metrics["n_params"] = get_num_parameters(model)
 	metrics["size"] = get_model_size(model)
 	if display:
 		print(f"MACs: {metrics['macs']}")
 		print(f"Sparsity: {metrics['sparsity']}")
 		print(f"Parameters: {metrics['n_params']/1e6} M")
 		print(f"Size: {metrics['size']/(8*1000*1000)} Mb")
-	if save_path is not None:
-		with open(save_path, "x") as f:
-			json.dump(metrics, f)
-
-def get_model_macs(model, inputs) -> int:
-    return profile_macs(model, inputs)
+	return metrics
 
 def get_sparsity(tensor: torch.Tensor) -> float:
     """
@@ -64,4 +76,12 @@ def get_model_size(model: nn.Module, data_width=32, count_nonzero_only=False) ->
     :param count_nonzero_only: only count nonzero weights
     """
     return get_num_parameters(model, count_nonzero_only) * data_width
+
+
+
+
+
+
+
+
 
