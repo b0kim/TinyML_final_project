@@ -4,19 +4,11 @@
 output_dir=ENTER_A_VALUE # output directory
 model=google/vit-base-patch16-224 # huggingface pretrained model tag
 dataset=ENTER_A_VALUE # local dataset path
-name=vit # name for all outputs
+prune_name=taylor_prune_imagenet # directory name for pruning results
+tune_name=tune_taylor_pruned_imagenet # directory name for finetuning results
 
 # --------------------------------------------------------------------
-# evaluate full model
-
-# finetune full model
 
 # prune model
 
-# evaluate pruned model
-
 # finetune pruned model
-
-# evaluate tuned pruned model
-
-

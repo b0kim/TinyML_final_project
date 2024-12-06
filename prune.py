@@ -20,7 +20,7 @@ if __name__=="__main__":
 	parser = argparse.ArgumentParser()
 	# general arguments
 	parser.add_argument("-m", "--model", default="google/vit-base-patch16-224", help="Which model tag to load, or a path to a local .pt file")
-	parser.add_argument("-d", "--dataset", required=True, choices=["imagenet-1k", "beans", "coralnet"], help="Dataset choice")
+	parser.add_argument("-d", "--dataset", default="imagenet-1k", choices=["imagenet-1k", "beans", "coralnet"], help="Dataset choice")
 	parser.add_argument("-c", "--cache", default="~/.cache/huggingface", help="Huggingface cache directory")
 	parser.add_argument("-o", "--output-root", default="./results", help="Root experiment directory")
 	parser.add_argument("-en", "--experiment-name", required=True, help="What to name this experiment")
