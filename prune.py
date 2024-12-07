@@ -62,7 +62,7 @@ if __name__=="__main__":
 	elif args.dataset == "beans":
 		prepared_ds, processor, collate_fn = get_beans(args.cache, hf_model_name)
 	elif args.dataset == "coralnet":
-		raise NotImplementedError
+		prepared_ds, processor, collate_fn = get_coralnet(args.cache, hf_model_name)
 	dummy_input = torch.randn(1, 3, 224, 224).to(device)
 
 	# evaluate model
