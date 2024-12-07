@@ -75,7 +75,7 @@ def get_coralnet(cache, model_tag):
 			"labels": torch.tensor([x["label"] for x in batch])
 		}
 
-	ds = load_dataset("imagefolder", data_dir="/srv/warplab/coralnet-patches/images_10000")
+	ds = load_dataset("imagefolder", data_dir="/srv/warplab/coralnet-patches/images_50000")
 	prepared_ds = ds.with_transform(process_batch)
 	return prepared_ds, processor, collate_fn
 
