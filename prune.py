@@ -31,6 +31,7 @@ if __name__=="__main__":
 	parser.add_argument("-b", "--bottleneck", default=False, action="store_true", help="Bottleneck or uniform")
 	parser.add_argument("-pt", "--pruning-type", default="l1", type=str, choices=["random", "taylor", "l1"], help="Pruning type")
 	parser.add_argument("-gp", "--global-pruning", default=False, action="store_true", help="Global pruning")
+	parser.add_argument("-ip", "--isomorphic-pruning", default=False, action="store_true", help="Isomorphic pruning")
 	parser.add_argument("-tbs", "--train-batch-size", default=64, type=int, help="Training batch size")
 	parser.add_argument("-vbs", "--val-batch-size", default=128, type=int, help="Validation batch size")
 	args = parser.parse_args()
@@ -100,6 +101,7 @@ if __name__=="__main__":
 		pruning_ratio=args.pruning_ratio,
 		ignored_layers=ignored_layers,
 		global_pruning=args.global_pruning,
+		isomorphic=args.isomorphic_pruning,
 		output_transform=lambda out: out.logits.sum(),
 		num_heads=num_heads,
 		prune_head_dims=True,
