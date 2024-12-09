@@ -2,13 +2,19 @@
 This is a final project for MIT 6.5940, taken Fall 2024.
 
 # Installation
-## Datasets
-We use the following two datasets to generate our results:
+The `install.sh` script will run all the installation steps described below:
 
-- Imagenet-1k: https://image-net.org/index.php
-- Coralnet: https://coralnet.ucsd.edu
+1. We include a modified version of the Torch-Pruning library. To install it:
 
-Imagenet is automatically downloaded through huggingface. For Coralnet, we use a curated subset of 960,000 images labeled by substrate type. This curated dataset is not currently hosted publicly, but please contact ericrc@mit.edu if you're interested in accessing it. 
+`cd Torch-Pruning && pip install -e .`
+
+2. We include a `requirements.txt` file to help setup a python environment:
+
+`pip install -r requirements.txt`
+
+3. We use a subset of the CoralNet coral classification dataset: https://coralnet.ucsd.edu. To extract our sanitized dataset:
+
+`unzip coralnet.zip`
 
 # Usage
 
@@ -44,4 +50,7 @@ Just like with pruning, if you want to finetune custom weights that are stored l
 `python3 train.py --model path/to/pytorch/weights.pt --dataset imagenet-1k --cache .../.cache/huggingface --experiment-name imagenet_training_run `
 
 # Acknowledgements
-We would like to thank the MIT 6.5940 course staff. Our codebase was built on top of the Torch-Pruning repository: https://github.com/VainF/Torch-Pruning/tree/master
+We would like to thank the MIT 6.5940 course staff. Our codebase was built on top of the Torch-Pruning repository: https://github.com/VainF/Torch-Pruning/tree/master. We use pre-trained models from Huggingface repositories for our experiments:
+
+Google ViT-B: https://huggingface.co/google/vit-base-patch16-224
+Google ViT-B-in21k: https://huggingface.co/google/vit-base-patch16-224-in21k
