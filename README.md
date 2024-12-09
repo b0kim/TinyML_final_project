@@ -61,7 +61,9 @@ Just like with pruning, if you want to finetune custom weights that are stored l
 `python3 train.py --model path/to/pytorch/weights.pt --dataset coralnet --cache .../.cache/huggingface --experiment-name training_run `
 
 # Acknowledgements
-We would like to thank the MIT 6.5940 course staff. Our codebase was built on top of the Torch-Pruning repository: https://github.com/VainF/Torch-Pruning/tree/master. We use pre-trained models from Huggingface repositories for our experiments:
+We would like to thank the MIT 6.5940 course staff for their help throughout the semester.
 
-Google ViT-B: https://huggingface.co/google/vit-base-patch16-224
-Google ViT-B-in21k: https://huggingface.co/google/vit-base-patch16-224-in21k
+We use a subset of the CoralNet open-source dataset for our experiments: https://coralnet.ucsd.edu. Our codebase was built on top of the Torch-Pruning repository: https://github.com/VainF/Torch-Pruning/tree/master. We use pre-trained models from Huggingface repositories for our experiments:
+
+* Google ViT-B: https://huggingface.co/google/vit-base-patch16-224
+* Google ViT-B-in21k: https://huggingface.co/google/vit-base-patch16-224-in21k
